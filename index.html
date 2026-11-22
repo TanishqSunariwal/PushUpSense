@@ -6,63 +6,56 @@
 <title>PushUpSense</title>
 <style>
   :root {
-    --bg: #0e1318; --card: #19212a; --text: #f2f5f7; --muted: #8a98a6;
-    --accent: #2ee6a6; --gold: #ffb020; --danger: #ff5c6c; --line: #2a3541;
+    --bg: #0f1419;
+    --card: #1a222b;
+    --text: #f2f5f7;
+    --muted: #8a98a6;
+    --accent: #2ee6a6;
+    --accent2: #ffb020;
+    --danger: #ff5c6c;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  body { min-height: 100vh; padding: 16px 16px calc(28px + env(safe-area-inset-bottom)); }
+  body { min-height: 100vh; padding: 16px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
   .wrap { max-width: 480px; margin: 0 auto; }
-
-  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 10px; }
-  h1 { font-size: 22px; margin: 0; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .3px; }
   h1 span { color: var(--accent); }
-  .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); text-align: right; }
-  .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); }
+  .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); }
   .dot.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-  .dot.wait { background: var(--gold); }
-
   .card { background: var(--card); border-radius: 20px; padding: 18px; margin-bottom: 14px; }
-
-  .ringbox { position: relative; width: 250px; height: 250px; margin: 4px auto 0; }
+  .ringbox { position: relative; width: 260px; height: 260px; margin: 6px auto 0; }
   .ringbox svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-  .ring-bg { fill: none; stroke: var(--line); stroke-width: 14; }
+  .ring-bg { fill: none; stroke: #2a3541; stroke-width: 14; }
   .ring-fg { fill: none; stroke: var(--accent); stroke-width: 14; stroke-linecap: round;
-    transition: stroke-dashoffset .4s ease, stroke .3s; }
-  .ring-fg.done { stroke: var(--gold); }
-  .center { position: absolute; inset: 0; display: flex; flex-direction: column;
+    stroke-dasharray: 565.49; stroke-dashoffset: 565.49; transition: stroke-dashoffset .5s ease, stroke .3s; }
+  .ring-fg.done { stroke: var(--accent2); }
+  .count-center { position: absolute; inset: 0; display: flex; flex-direction: column;
     align-items: center; justify-content: center; }
-  #count { font-size: 92px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  #count { font-size: 96px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   #count.pop { animation: pop .45s cubic-bezier(.2,1.6,.4,1); }
-  @keyframes pop { 0% { transform: scale(1); } 35% { transform: scale(1.3); color: var(--accent); } 100% { transform: scale(1); } }
+  @keyframes pop { 0% { transform: scale(1); } 35% { transform: scale(1.35); color: var(--accent); } 100% { transform: scale(1); } }
   .sub { color: var(--muted); font-size: 14px; margin-top: 4px; }
-  #goalmsg { text-align: center; min-height: 22px; margin-top: 8px; font-weight: 700; color: var(--gold); }
-
+  #msg { text-align: center; min-height: 22px; margin-top: 10px; font-weight: 700; color: var(--accent2); }
   .fig { width: 100%; height: auto; display: block; }
-
   .row { display: flex; gap: 10px; flex-wrap: wrap; }
   button { flex: 1 1 140px; border: 0; border-radius: 14px; padding: 15px 12px; font-size: 16px;
     font-weight: 700; color: #06231a; background: var(--accent); cursor: pointer; }
-  button.secondary { background: var(--line); color: var(--text); }
+  button.secondary { background: #2a3541; color: var(--text); }
   button:disabled { opacity: .45; cursor: default; }
-
-  #error { color: var(--danger); font-size: 14px; margin-top: 10px; display: none; }
-  .info { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; word-break: break-all; }
-
   .goal { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .goal label { color: var(--muted); font-size: 14px; }
   .goal input { width: 90px; padding: 10px; border-radius: 10px; border: 1px solid #34414f;
-    background: var(--bg); color: var(--text); font-size: 18px; text-align: center; }
-
-  .note { font-size: 13px; color: var(--muted); line-height: 1.55; margin: 12px 0 0; }
-  .note b { color: var(--text); }
-  footer { text-align: center; font-size: 12px; color: var(--muted); margin-top: 6px; }
+    background: #0f1419; color: var(--text); font-size: 18px; text-align: center; }
+  #note { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  #note b { color: var(--text); }
+  #error { color: var(--danger); font-size: 14px; margin-top: 8px; display: none; }
 </style>
 </head>
 <body>
 <div class="wrap">
-
   <header>
     <h1>PushUp<span>Sense</span></h1>
     <div class="status"><div id="dot" class="dot"></div><span id="statusText">Not connected</span></div>
@@ -74,20 +67,20 @@
         <circle class="ring-bg" cx="100" cy="100" r="90"></circle>
         <circle id="ring" class="ring-fg" cx="100" cy="100" r="90"></circle>
       </svg>
-      <div class="center">
+      <div class="count-center">
         <div id="count">0</div>
         <div class="sub" id="goalText">of 20 push-ups</div>
       </div>
     </div>
-    <div id="goalmsg"></div>
+    <div id="msg"></div>
   </div>
 
   <div class="card">
     <svg class="fig" viewBox="0 0 340 190" aria-label="Push-up animation">
       <line x1="10" y1="152" x2="330" y2="152" stroke="#34414f" stroke-width="4" stroke-linecap="round"></line>
-      <line id="figBody" stroke="#f2f5f7" stroke-width="9" stroke-linecap="round"></line>
-      <line id="figArm" stroke="#2ee6a6" stroke-width="8" stroke-linecap="round"></line>
-      <circle id="figHead" r="15" fill="#f2f5f7"></circle>
+      <line id="body" stroke="#f2f5f7" stroke-width="9" stroke-linecap="round"></line>
+      <line id="arm" stroke="#2ee6a6" stroke-width="8" stroke-linecap="round"></line>
+      <circle id="head" r="15" fill="#f2f5f7"></circle>
       <circle cx="68" cy="150" r="5" fill="#2ee6a6"></circle>
       <circle cx="270" cy="150" r="5" fill="#8a98a6"></circle>
     </svg>
@@ -99,10 +92,6 @@
       <button id="resetBtn" class="secondary" disabled>Reset</button>
     </div>
     <div id="error"></div>
-    <div class="info">
-      <div id="ageText">Data: waiting for connection</div>
-      <div id="rawText">Last data: none yet</div>
-    </div>
   </div>
 
   <div class="card goal">
@@ -114,226 +103,157 @@
     <div class="row">
       <button id="demoBtn" class="secondary">Test animation (no Bluetooth)</button>
     </div>
-    <p class="note">
-      <b>How to use:</b> power the Arduino, open this page in <b>Chrome</b> (Mac / Android) or
-      <b>Bluefy</b> (iPhone), tap <b>Connect</b> and choose your module. Close nRF Connect first.
-      The Arduino resets the count to 0 after 10 seconds without movement.
+    <p id="note">
+      <b>How to use:</b> power the Arduino, open this page in a browser that supports Web Bluetooth
+      (<b>Bluefy</b> on iPhone, <b>Chrome</b> on Android), tap <b>Connect</b>, and pick your module.
+      Close nRF Connect first, since the module can only talk to one app at a time.
     </p>
   </div>
-
-  <footer>PushUpSense page v2</footer>
 </div>
 
 <script>
 (function () {
-  'use strict';
-
   var SERVICE = 0xFFE0, CHAR = 0xFFE1;
-  var CIRC = 2 * Math.PI * 90;
+  var C = 2 * Math.PI * 90;
 
-  function $(id) { return document.getElementById(id); }
-  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  var el = function (id) { return document.getElementById(id); };
+  var countEl = el('count'), ringEl = el('ring'), msgEl = el('msg'), goalText = el('goalText');
+  var dot = el('dot'), statusText = el('statusText'), errEl = el('error');
+  var connectBtn = el('connectBtn'), resetBtn = el('resetBtn'), demoBtn = el('demoBtn');
+  var goalInput = el('goalInput');
+  var bodyEl = el('body'), armEl = el('arm'), headEl = el('head');
 
-  var countEl = $('count'), ringEl = $('ring'), goalText = $('goalText'), goalMsg = $('goalmsg');
-  var dotEl = $('dot'), statusEl = $('statusText'), errEl = $('error');
-  var ageEl = $('ageText'), rawEl = $('rawText');
-  var connectBtn = $('connectBtn'), resetBtn = $('resetBtn'), demoBtn = $('demoBtn');
-  var goalInput = $('goalInput');
+  var device = null, characteristic = null, buffer = '';
+  var count = 0, goal = 20, animating = false, wakeLock = null;
 
-  /* ================= state ================= */
-  var count = 0;
-  var goal = 20;
-  var repStart = -100000;          // time of the last push-up (drives the figure)
-  var lastRx = 0;                  // time of the last data from the Arduino
-  var buf = '';
-  var wakeLock = null;
-
-  var link = { device: null, ch: null, want: false, busy: false };
-
-  /* ================= stick figure (one permanent loop, no flags) ================= */
-  var figBody = $('figBody'), figArm = $('figArm'), figHead = $('figHead');
+  /* ---------- stick figure ---------- */
   var FEET = { x: 270, y: 150 }, HAND = { x: 68, y: 150 };
-
-  function drawFigure(t) {                 // t: 0 = arms straight, 1 = chest down
-    var sx = 85, sy = 92 + 46 * t;
-    var dx = sx - FEET.x, dy = sy - FEET.y, len = Math.sqrt(dx * dx + dy * dy);
-    figBody.setAttribute('x1', FEET.x); figBody.setAttribute('y1', FEET.y - 4);
-    figBody.setAttribute('x2', sx);     figBody.setAttribute('y2', sy);
-    figArm.setAttribute('x1', sx);      figArm.setAttribute('y1', sy);
-    figArm.setAttribute('x2', HAND.x);  figArm.setAttribute('y2', HAND.y);
-    figHead.setAttribute('cx', sx + dx / len * 22);
-    figHead.setAttribute('cy', sy + dy / len * 22);
+  function drawFigure(t) {            // t: 0 = arms straight (up), 1 = chest down
+    var sh = { x: 85, y: 92 + 46 * t };
+    var dx = sh.x - FEET.x, dy = sh.y - FEET.y, len = Math.sqrt(dx * dx + dy * dy);
+    var head = { x: sh.x + dx / len * 22, y: sh.y + dy / len * 22 };
+    bodyEl.setAttribute('x1', FEET.x); bodyEl.setAttribute('y1', FEET.y - 4);
+    bodyEl.setAttribute('x2', sh.x);   bodyEl.setAttribute('y2', sh.y);
+    armEl.setAttribute('x1', sh.x);    armEl.setAttribute('y1', sh.y);
+    armEl.setAttribute('x2', HAND.x);  armEl.setAttribute('y2', HAND.y);
+    headEl.setAttribute('cx', head.x); headEl.setAttribute('cy', head.y);
   }
-  function frame(now) {
-    var p = (now - repStart) / 700;
-    drawFigure(p >= 0 && p <= 1 ? Math.sin(Math.PI * p) : 0);
-    requestAnimationFrame(frame);
+  function animateRep() {
+    if (animating) return;
+    animating = true;
+    var start = performance.now(), dur = 700;
+    function step(now) {
+      var p = Math.min((now - start) / dur, 1);
+      drawFigure(Math.sin(Math.PI * p));
+      if (p < 1) requestAnimationFrame(step); else { drawFigure(0); animating = false; }
+    }
+    requestAnimationFrame(step);
   }
-  requestAnimationFrame(frame);
+  drawFigure(0);
 
-  /* ================= count display ================= */
-  function render() {
-    countEl.textContent = String(count);
+  /* ---------- count display ---------- */
+  function render(animate) {
+    countEl.textContent = count;
     var frac = Math.min(count / goal, 1);
-    ringEl.style.strokeDasharray = String(CIRC);
-    ringEl.style.strokeDashoffset = String(CIRC * (1 - frac));
+    ringEl.style.strokeDasharray = C;
+    ringEl.style.strokeDashoffset = C * (1 - frac);
     goalText.textContent = 'of ' + goal + ' push-ups';
-    var done = count > 0 && count >= goal;
-    ringEl.classList.toggle('done', done);
-    goalMsg.textContent = done ? 'Goal reached!' : '';
+    if (count >= goal && count > 0) {
+      ringEl.classList.add('done'); msgEl.textContent = 'Goal reached!';
+    } else {
+      ringEl.classList.remove('done'); msgEl.textContent = '';
+    }
+    if (animate) {
+      countEl.classList.remove('pop'); void countEl.offsetWidth; countEl.classList.add('pop');
+      animateRep();
+    }
   }
   function setCount(n) {
-    var up = n > count;
+    var increased = n > count;
     count = n;
-    render();
-    if (up) {
-      repStart = performance.now();
-      countEl.classList.remove('pop');
-      void countEl.offsetWidth;
-      countEl.classList.add('pop');
-    }
+    render(increased);
   }
   goalInput.addEventListener('input', function () {
     var g = parseInt(goalInput.value, 10);
-    if (g > 0) { goal = g; render(); }
+    if (g > 0) { goal = g; render(false); }
   });
-  render();
+  render(false);
 
-  /* ================= status helpers ================= */
-  function setStatus(kind, text) {            // kind: 'on' | 'wait' | 'off'
-    dotEl.className = 'dot' + (kind === 'on' ? ' on' : kind === 'wait' ? ' wait' : '');
-    statusEl.textContent = text;
-  }
-  function showError(t) { errEl.textContent = t; errEl.style.display = t ? 'block' : 'none'; }
+  /* ---------- Bluetooth ---------- */
+  function showError(text) { errEl.textContent = text; errEl.style.display = text ? 'block' : 'none'; }
+  function setStatus(on, text) { dot.classList.toggle('on', on); statusText.textContent = text; }
 
-  /* ================= incoming data ================= */
-  function onData(ev) {
-    lastRx = Date.now();
-    var text = new TextDecoder('utf-8').decode(ev.target.value);
-    rawEl.textContent = 'Last data: ' + JSON.stringify(text);
-    buf += text;
-    if (buf.length > 200) buf = buf.slice(-200);
-    var cut = buf.lastIndexOf('\n');
-    if (cut < 0) return;                          // wait for the end of the line
-    var complete = buf.slice(0, cut);
-    buf = buf.slice(cut + 1);
-    var re = /Count:\s*(\d+)/g, m, last = null;
-    while ((m = re.exec(complete)) !== null) last = m[1];
-    if (last !== null) setCount(parseInt(last, 10));
-  }
-
-  /* ================= Bluetooth link ================= */
-  async function openLink() {
-    var d = link.device;
-    var server = await d.gatt.connect();
-    var service = await server.getPrimaryService(SERVICE);
-    var ch = await service.getCharacteristic(CHAR);
-    if (link.ch) { try { link.ch.removeEventListener('characteristicvaluechanged', onData); } catch (e) {} }
-    ch.addEventListener('characteristicvaluechanged', onData);
-    await ch.startNotifications();
-    link.ch = ch;
-    lastRx = Date.now();
-    resetBtn.disabled = false;
-    setStatus('on', 'Connected');
-  }
-
-  async function recover(text, hard) {
-    if (link.busy || !link.want) return;
-    link.busy = true;
-    setStatus('wait', text);
-    try {
-      if (link.ch) { try { await link.ch.stopNotifications(); } catch (e) {} }
-      if (hard && link.device.gatt.connected) { link.device.gatt.disconnect(); await sleep(500); }
-      await openLink();
-    } catch (e) {
-      setStatus('wait', 'Retrying...');
-    }
-    link.busy = false;
+  function handleData(event) {
+    var chunk = new TextDecoder('utf-8').decode(event.target.value);
+    buffer += chunk;
+    var lines = buffer.split(/\r?\n/);
+    buffer = lines.pop();            // keep any unfinished line
+    lines.forEach(function (line) {
+      var m = /Count:\s*(\d+)/i.exec(line);
+      if (m) setCount(parseInt(m[1], 10));
+    });
+    // also accept a bare "Count: N" with no newline yet
+    var m2 = /^Count:\s*(\d+)$/i.exec(buffer.trim());
+    if (m2) { setCount(parseInt(m2[1], 10)); buffer = ''; }
   }
 
   async function connect() {
     showError('');
     if (!navigator.bluetooth) {
-      showError('This browser has no Web Bluetooth. Use Chrome (Mac/Android) or Bluefy (iPhone).');
+      showError('This browser does not support Web Bluetooth. On iPhone use the free Bluefy browser; on Android use Chrome.');
       return;
     }
     try {
-      connectBtn.disabled = true;
-      setStatus('wait', 'Choose your module...');
-      link.device = await navigator.bluetooth.requestDevice({
+      connectBtn.disabled = true; setStatus(false, 'Connecting...');
+      device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
         optionalServices: [SERVICE]
       });
-      link.device.addEventListener('gattserverdisconnected', function () {
-        if (link.want) setStatus('wait', 'Disconnected, reconnecting...');
-      });
-      link.want = true;
-      link.busy = true;
-      setStatus('wait', 'Connecting...');
-      await openLink();
-      link.busy = false;
-      connectBtn.textContent = 'Disconnect';
-      connectBtn.disabled = false;
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+      var server = await device.gatt.connect();
+      var service = await server.getPrimaryService(SERVICE);
+      characteristic = await service.getCharacteristic(CHAR);
+      await characteristic.startNotifications();
+      characteristic.addEventListener('characteristicvaluechanged', handleData);
+      setStatus(true, 'Connected');
+      connectBtn.textContent = 'Disconnect'; connectBtn.disabled = false;
+      resetBtn.disabled = false;
       try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
     } catch (e) {
-      link.busy = false;
-      link.want = false;
       connectBtn.disabled = false;
-      setStatus('off', 'Not connected');
-      if (!(e && e.name === 'NotFoundError')) showError('Could not connect: ' + (e && e.message ? e.message : e));
+      setStatus(false, 'Not connected');
+      if (e && e.name !== 'NotFoundError') showError('Could not connect: ' + (e.message || e));
     }
   }
-
-  function disconnect() {
-    link.want = false;
-    resetBtn.disabled = true;
-    try { if (link.device && link.device.gatt.connected) link.device.gatt.disconnect(); } catch (e) {}
-    link.ch = null;
-    connectBtn.textContent = 'Connect';
-    setStatus('off', 'Not connected');
-    ageEl.textContent = 'Data: waiting for connection';
+  function onDisconnected() {
+    setStatus(false, 'Not connected');
+    connectBtn.textContent = 'Connect'; connectBtn.disabled = false;
+    resetBtn.disabled = true; characteristic = null;
     if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
   }
-
+  function disconnect() {
+    if (device && device.gatt.connected) device.gatt.disconnect(); else onDisconnected();
+  }
   connectBtn.addEventListener('click', function () {
-    if (link.want) disconnect(); else connect();
+    if (device && device.gatt && device.gatt.connected) disconnect(); else connect();
   });
 
-  /* ================= watchdog: never stay silent ================= */
-  setInterval(function () {
-    if (!link.want) return;
-    var age = Date.now() - lastRx;
-    ageEl.textContent = 'Data: last message ' + (age / 1000).toFixed(1) + ' s ago';
-    if (link.busy) return;
-    var connected = link.device && link.device.gatt && link.device.gatt.connected;
-    if (!connected)      recover('Reconnecting...', false);
-    else if (age > 10000) recover('No data, reconnecting...', true);
-    else if (age > 4000)  recover('Re-subscribing...', false);
-  }, 1000);
-
-  /* ================= reset ================= */
   resetBtn.addEventListener('click', async function () {
-    showError('');
-    if (!link.ch) return;
     var data = new TextEncoder().encode('r');
-    for (var i = 0; i < 3; i++) {
-      try {
-        if (link.ch.properties.write) await link.ch.writeValue(data);
-        else await link.ch.writeValueWithoutResponse(data);
-      } catch (e) {
-        showError('Reset failed: ' + (e && e.message ? e.message : e));
-        return;
-      }
-      await sleep(1000);
-      if (count === 0) return;               // Arduino confirmed with "Count: 0"
+    try {
+      if (characteristic.writeValueWithoutResponse) await characteristic.writeValueWithoutResponse(data);
+      else await characteristic.writeValue(data);
+    } catch (e1) {
+      try { await characteristic.writeValue(data); }
+      catch (e2) { showError('Reset failed: ' + (e2.message || e2)); return; }
     }
-    showError('The Arduino did not confirm the reset. Upload the newest Arduino code.');
+    count = 0; render(false);
   });
 
   demoBtn.addEventListener('click', function () { setCount(count + 1); });
 
   document.addEventListener('visibilitychange', async function () {
-    if (document.visibilityState === 'visible' && link.want && navigator.wakeLock) {
+    if (document.visibilityState === 'visible' && device && device.gatt.connected && navigator.wakeLock) {
       try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
     }
   });
