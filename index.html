@@ -92,7 +92,6 @@
       <button id="resetBtn" class="secondary" disabled>Reset</button>
     </div>
     <div id="error"></div>
-    <div id="raw" style="margin-top:10px;font-size:12px;color:#8a98a6;word-break:break-all">Last data: none yet</div>
   </div>
 
   <div class="card goal">
@@ -125,7 +124,7 @@
   var bodyEl = el('body'), armEl = el('arm'), headEl = el('head');
 
   var device = null, characteristic = null, buffer = '';
-  var count = 0, goal = 20, animating = false, wakeLock = null, lastRx = 0;
+  var count = 0, goal = 20, animating = false, wakeLock = null;
 
   /* ---------- stick figure ---------- */
   var FEET = { x: 270, y: 150 }, HAND = { x: 68, y: 150 };
@@ -185,9 +184,7 @@
   function setStatus(on, text) { dot.classList.toggle('on', on); statusText.textContent = text; }
 
   function handleData(event) {
-    lastRx = Date.now();
     var chunk = new TextDecoder('utf-8').decode(event.target.value);
-    document.getElementById('raw').textContent = 'Last data: ' + JSON.stringify(chunk);
     buffer += chunk;
     var lines = buffer.split(/\r?\n/);
     buffer = lines.pop();            // keep any unfinished line
@@ -218,7 +215,6 @@
       characteristic = await service.getCharacteristic(CHAR);
       await characteristic.startNotifications();
       characteristic.addEventListener('characteristicvaluechanged', handleData);
-      lastRx = Date.now();
       setStatus(true, 'Connected');
       connectBtn.textContent = 'Disconnect'; connectBtn.disabled = false;
       resetBtn.disabled = false;
@@ -242,30 +238,17 @@
     if (device && device.gatt && device.gatt.connected) disconnect(); else connect();
   });
 
-  // Reset: send 'r' and wait for the Arduino to confirm with "Count: 0".
-  // The page never sets the count to 0 by itself, so it always matches the Arduino.
   resetBtn.addEventListener('click', async function () {
-    showError('');
-    if (!characteristic) return;
     var data = new TextEncoder().encode('r');
-    var props = characteristic.properties;
-    for (var attempt = 1; attempt <= 3; attempt++) {
-      try {
-        if (props.write) await characteristic.writeValue(data);
-        else await characteristic.writeValueWithoutResponse(data);
-      } catch (e) { showError('Reset failed: ' + (e.message || e)); return; }
-      await new Promise(function (r) { setTimeout(r, 900); });
-      if (count === 0) return;
+    try {
+      if (characteristic.writeValueWithoutResponse) await characteristic.writeValueWithoutResponse(data);
+      else await characteristic.writeValue(data);
+    } catch (e1) {
+      try { await characteristic.writeValue(data); }
+      catch (e2) { showError('Reset failed: ' + (e2.message || e2)); return; }
     }
-    showError('The Arduino did not confirm the reset. Make sure the new Arduino code is uploaded.');
+    count = 0; render(false);
   });
-
-  // Watchdog: the Arduino now sends the count every second, so silence means a problem.
-  setInterval(function () {
-    if (device && device.gatt && device.gatt.connected) {
-      statusText.textContent = (Date.now() - lastRx > 5000) ? 'Connected, no data for 5 s' : 'Connected';
-    }
-  }, 1000);
 
   demoBtn.addEventListener('click', function () { setCount(count + 1); });
 
