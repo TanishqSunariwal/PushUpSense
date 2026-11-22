@@ -92,6 +92,7 @@
       <button id="resetBtn" class="secondary" disabled>Reset</button>
     </div>
     <div id="error"></div>
+    <div id="raw" style="margin-top:10px;font-size:12px;color:#8a98a6;word-break:break-all">Last data: none yet</div>
   </div>
 
   <div class="card goal">
@@ -186,6 +187,7 @@
   function handleData(event) {
     lastRx = Date.now();
     var chunk = new TextDecoder('utf-8').decode(event.target.value);
+    document.getElementById('raw').textContent = 'Last data: ' + JSON.stringify(chunk);
     buffer += chunk;
     var lines = buffer.split(/\r?\n/);
     buffer = lines.pop();            // keep any unfinished line
