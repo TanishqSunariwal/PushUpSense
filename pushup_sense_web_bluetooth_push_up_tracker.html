@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PushUp Sense | Web Bluetooth Arduino Push-Up Counter</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            slate: {
+              925: '#080d1a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #060a14;
+      color: #f8fafc;
+      overflow-x: hidden;
+    }
+
+    /* Subtle grid background */
+    .bg-grid {
+      background-size: 32px 32px;
+      background-image: 
+        linear-gradient(to right, rgba(30, 41, 59, 0.35) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(30, 41, 59, 0.35) 1px, transparent 1px);
+    }
+
+    /* Glow effects */
+    .glow-cyan {
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.25);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.3);
+    }
+
+    /* Rep Counter Pop Animation */
+    @keyframes counterPop {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.18); color: #34d399; text-shadow: 0 0 28px rgba(52, 211, 153, 0.7); }
+      100% { transform: scale(1); }
+    }
+    .animate-pop {
+      animation: counterPop 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Ultrasonic wave pulse */
+    @keyframes radarWave {
+      0% { opacity: 0.85; transform: translateY(0) scaleX(0.7); }
+      100% { opacity: 0; transform: translateY(-22px) scaleX(1.35); }
+    }
+    .wave-1 { animation: radarWave 1.5s infinite ease-out; }
+    .wave-2 { animation: radarWave 1.5s infinite ease-out 0.5s; }
+    .wave-3 { animation: radarWave 1.5s infinite ease-out 1.0s; }
+
+    /* Custom range slider */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      background: #1e293b;
+      height: 8px;
+      border-radius: 999px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      margin-top: -5px;
+      background-color: #10b981;
+      height: 18px;
+      width: 18px;
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
+      border: 2px solid #ffffff;
+    }
+  </style>
+</head>
+<body class="bg-grid min-h-screen flex flex-col justify-between selection:bg-emerald-500 selection:text-slate-950">
+
+  <!-- Notification Toast Banner (replaces alert()) -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <svg class="w-6 h-6 text-slate-950" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg sm:text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
+            PushUp <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">Sense</span>
+          </h1>
+          <p class="text-xs text-slate-400 hidden sm:block">Arduino + Ultrasonic BLE Workout Telemetry</p>
+        </div>
+      </div>
+
+      <!-- Right Controls: Sound Toggle, Arduino Sketch Modal, BLE Connect -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Audio Beep Toggle -->
+        <button id="btn-sound" onclick="toggleSound()" title="Toggle Rep Sound"
+          class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-emerald-400 transition flex items-center gap-1.5 text-xs font-semibold">
+          <svg id="icon-sound-on" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+          </svg>
+          <svg id="icon-sound-off" class="w-4 h-4 hidden text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+          </svg>
+          <span class="hidden md:inline" id="label-sound">Beep ON</span>
+        </button>
+
+        <!-- Arduino Code Button -->
+        <button onclick="toggleCodeModal(true)"
+          class="px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-cyan-400 transition flex items-center gap-1.5 text-xs sm:text-sm font-semibold">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+          <span>Arduino Code</span>
+        </button>
+
+        <!-- Connect / Disconnect BLE Button -->
+        <button id="btn-ble" onclick="handleBluetoothClick()"
+          class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 transition transform active:scale-95 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+          </svg>
+          <span id="btn-ble-text">Connect Arduino</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Dashboard Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- LEFT COLUMN: Line Diagram Push-Up Animation Stage (7 cols on lg) -->
+    <section class="lg:col-span-7 flex flex-col gap-4">
+      <!-- Status Bar & Device Info -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5">
+          <span id="status-dot" class="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]"></span>
+          <span id="status-text" class="text-xs sm:text-sm font-semibold text-slate-300">Disconnected (Demo Mode Ready)</span>
+        </div>
+        <div class="flex items-center gap-3 text-xs font-mono text-slate-400">
+          <span>RAW RX: <strong id="raw-rx" class="text-cyan-400">--</strong></span>
+        </div>
+      </div>
+
+      <!-- Interactive Push-Up Line Diagram Canvas Card -->
+      <div class="relative bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-6 flex flex-col justify-between flex-1 min-h-[360px] sm:min-h-[430px] overflow-hidden glow-cyan">
+        <!-- Top Overlay Badges -->
+        <div class="flex items-center justify-between z-10">
+          <div class="flex items-center gap-2">
+            <span class="px-3 py-1 rounded-full bg-slate-950/90 border border-slate-700/80 text-xs font-mono text-slate-300">
+              SENSOR DIST: <strong id="hud-distance" class="text-emerald-400 text-sm">35 cm</strong>
+            </span>
+          </div>
+          <div>
+            <span id="phase-badge" class="px-3.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 text-xs font-bold tracking-wider uppercase">
+              READY • UP POSITION
+            </span>
+          </div>
+        </div>
+
+        <!-- SVG Line Diagram Stage -->
+        <div class="relative w-full flex-1 flex items-center justify-center my-2">
+          <svg id="pushup-svg" viewBox="0 0 640 310" class="w-full h-auto max-h-[340px] select-none overflow-visible">
+            <defs>
+              <!-- Neon Glow Filter -->
+              <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3.5" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+
+              <!-- Sensor Beam Gradient -->
+              <linearGradient id="beam-grad" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stop-color="#10b981" stop-opacity="0.38" />
+                <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.0" />
+              </linearGradient>
+            </defs>
+
+            <!-- Floor Grid & Mat Line -->
+            <line x1="40" y1="265" x2="600" y2="265" stroke="#334155" stroke-width="3" stroke-linecap="round" />
+            <!-- Exercise Mat -->
+            <rect x="75" y="261" width="490" height="6" rx="3" fill="#0f172a" stroke="#1e293b" stroke-width="1.5" />
+
+            <!-- Distance Vertical Dashed Guideline between Sensor and Chest -->
+            <line id="svg-dist-line" x1="415" y1="252" x2="415" y2="145" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.65" />
+            <rect id="svg-dist-tag-bg" x="424" y="190" width="54" height="20" rx="5" fill="#0f172a" stroke="#10b981" stroke-width="1" opacity="0.9" />
+            <text id="svg-dist-tag" x="451" y="204" text-anchor="middle" fill="#34d399" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">35cm</text>
+
+            <!-- Ultrasonic Sensor Module on the Floor directly beneath chest (x=415, y=261) -->
+            <g id="ultrasonic-sensor" transform="translate(393, 247)">
+              <!-- Sensor PCB Base -->
+              <rect x="0" y="6" width="44" height="8" rx="2" fill="#0284c7" stroke="#38bdf8" stroke-width="1.2" />
+              <!-- Left & Right Transducer Cylinders -->
+              <rect x="4" y="0" width="14" height="7" rx="1.5" fill="#94a3b8" stroke="#e2e8f0" stroke-width="1" />
+              <rect x="26" y="0" width="14" height="7" rx="1.5" fill="#94a3b8" stroke="#e2e8f0" stroke-width="1" />
+              <!-- Ultrasonic Sonar Waves -->
+              <path class="wave-1" d="M 10 -4 Q 22 -12 34 -4" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" />
+              <path class="wave-2" d="M 8 -8 Q 22 -18 36 -8" fill="none" stroke="#34d399" stroke-width="1.8" stroke-linecap="round" />
+              <path class="wave-3" d="M 6 -12 Q 22 -24 38 -12" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round" />
+            </g>
+
+            <!-- Completion Pulse Ring (triggered on rep count) -->
+            <circle id="rep-pulse-ring" cx="415" cy="150" r="10" fill="none" stroke="#34d399" stroke-width="3" opacity="0" />
+
+            <!-- STICK FIGURE LINE DIAGRAM ATHLETE -->
+            <!-- Feet fixed on left mat (x=120, y=258), Hands fixed on right mat (x=435, y=258) -->
+            <g id="stickman" filter="url(#neon-glow)">
+              <!-- Back/Far Arm (subtle depth cue) -->
+              <polyline id="arm-far" points="415,145 426,202 430,258" fill="none" stroke="#0e7490" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+
+              <!-- Legs (Ankle -> Knee -> Hip) -->
+              <polyline id="legs" points="120,258 205,222 285,186" fill="none" stroke="#38bdf8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+
+              <!-- Shoe / Toe Anchor -->
+              <path id="foot" d="M 108,260 L 124,260 L 122,247 Z" fill="#38bdf8" />
+
+              <!-- Torso (Hip -> Shoulder/Chest) -->
+              <line id="torso" x1="285" y1="186" x2="415" y2="145" stroke="#34d399" stroke-width="9.5" stroke-linecap="round" />
+
+              <!-- Neck & Head -->
+              <line id="neck" x1="415" y1="145" x2="442" y2="134" stroke="#34d399" stroke-width="7" stroke-linecap="round" />
+              <circle id="head" cx="466" cy="126" r="21" fill="#080d1a" stroke="#34d399" stroke-width="5.5" />
+              <!-- Headband / Visor Accent for dynamic athletic look -->
+              <path id="visor" d="M 473,115 L 486,122" stroke="#06b6d4" stroke-width="4" stroke-linecap="round" />
+
+              <!-- Front/Primary Arm (Shoulder -> Elbow -> Hand) -->
+              <polyline id="arm-near" points="415,145 422,202 435,258" fill="none" stroke="#f8fafc" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" />
+
+              <!-- Hand Palm on Floor -->
+              <line x1="428" y1="259" x2="448" y2="259" stroke="#f8fafc" stroke-width="6" stroke-linecap="round" />
+
+              <!-- Joint Nodes (Hip, Shoulder, Elbow, Knee) -->
+              <circle id="joint-knee" cx="205" cy="222" r="4.5" fill="#06b6d4" />
+              <circle id="joint-hip" cx="285" cy="186" r="5.5" fill="#10b981" />
+              <circle id="joint-shoulder" cx="415" cy="145" r="6" fill="#ffffff" />
+              <circle id="joint-elbow" cx="422" cy="202" r="5" fill="#38bdf8" />
+            </g>
+          </svg>
+        </div>
+
+        <!-- Bottom Threshold Legend & Simulation Controls -->
+        <div class="border-t border-slate-800/90 pt-3.5 mt-1 flex flex-col gap-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+            <div class="flex items-center gap-4">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                Down Trigger: <strong class="text-slate-200">&le; <span id="lbl-down-thresh">14</span> cm</strong>
+              </span>
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                Up Complete: <strong class="text-slate-200">&ge; <span id="lbl-up-thresh">28</span> cm</strong>
+              </span>
+            </div>
+            <span class="text-slate-500 font-mono">HC-SR04 Ultrasonic Mode</span>
+          </div>
+
+          <!-- Interactive Simulator Bar (for testing without Arduino or overriding) -->
+          <div class="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-3 flex flex-col sm:flex-row items-center gap-3">
+            <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Simulator
+              </span>
+              <div class="flex items-center gap-1.5">
+                <button onclick="simulateDown()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-amber-300 border border-slate-700 transition active:scale-95">
+                  Go Down
+                </button>
+                <button onclick="simulateUp()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-cyan-300 border border-slate-700 transition active:scale-95">
+                  Go Up
+                </button>
+                <button onclick="simulateFullRep()" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-xs font-bold text-emerald-300 border border-emerald-500/40 transition active:scale-95">
+                  +1 Rep
+                </button>
+              </div>
+            </div>
+
+            <!-- Live Distance Slider -->
+            <div class="flex items-center gap-2.5 flex-1 w-full">
+              <span class="text-[11px] font-mono text-slate-400 whitespace-nowrap">8cm</span>
+              <input id="sim-slider" type="range" min="8" max="42" value="35" oninput="handleSliderInput(this.value)" class="w-full" />
+              <span class="text-[11px] font-mono text-slate-400 whitespace-nowrap">42cm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: Counter, Reset Key, Goal Progress & Serial Log (5 cols on lg) -->
+    <section class="lg:col-span-5 flex flex-col gap-5">
+
+      <!-- Main Counter Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-between relative overflow-hidden glow-emerald">
+        <div class="w-full flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-widest text-slate-400">Total Push-Ups</span>
+          <span class="px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 font-mono text-xs">
+            Hotkey: <kbd class="text-emerald-400 font-bold">R</kbd> Reset
+          </span>
+        </div>
+
+        <!-- Giant Rep Number -->
+        <div class="my-6 flex flex-col items-center">
+          <div id="rep-counter" class="font-mono text-8xl sm:text-9xl font-extrabold tracking-tighter text-white leading-none select-none">
+            0
+          </div>
+          <p id="rep-motivation" class="mt-3 text-xs sm:text-sm font-medium text-emerald-400">
+            Get into plank position to begin!
+          </p>
+        </div>
+
+        <!-- Reset Button -->
+        <button id="btn-reset" onclick="resetCounter()"
+          class="w-full py-3.5 px-5 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 hover:border-rose-400 text-rose-300 hover:text-rose-200 font-bold text-sm sm:text-base transition transform active:scale-98 flex items-center justify-center gap-2.5 shadow-lg shadow-rose-950/30">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Reset Counter to 0</span>
+        </button>
+      </div>
+
+      <!-- Target Goal & Calibration Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 flex flex-col gap-4">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Workout Goal</span>
+          <div class="flex items-center gap-1.5">
+            <label for="goal-input" class="text-xs text-slate-400">Target:</label>
+            <input id="goal-input" type="number" min="1" max="500" value="20" onchange="updateGoalUI()"
+              class="w-16 px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-right font-mono text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-500" />
+            <span class="text-xs text-slate-400">reps</span>
+          </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div>
+          <div class="flex justify-between text-xs font-mono mb-1.5">
+            <span id="goal-progress-text" class="text-slate-300">0 / 20 Completed</span>
+            <span id="goal-percent-text" class="text-emerald-400 font-bold">0%</span>
+          </div>
+          <div class="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+            <div id="goal-bar" class="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Sensor Calibration Thresholds -->
+        <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+            <label for="thresh-down" class="block text-[11px] text-slate-400 mb-1">Down Depth (&le; cm)</label>
+            <input id="thresh-down" type="number" min="4" max="30" value="14" onchange="updateThresholds()"
+              class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 font-mono text-sm font-bold text-amber-400 focus:outline-none focus:border-amber-400" />
+          </div>
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-2.5">
+            <label for="thresh-up" class="block text-[11px] text-slate-400 mb-1">Up Height (&ge; cm)</label>
+            <input id="thresh-up" type="number" min="15" max="60" value="28" onchange="updateThresholds()"
+              class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 font-mono text-sm font-bold text-cyan-400 focus:outline-none focus:border-cyan-400" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Live BLE Serial Monitor Log -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 flex flex-col gap-2 flex-1 min-h-[150px]">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+            Arduino BLE Monitor
+          </span>
+          <button onclick="clearLog()" class="text-[11px] text-slate-500 hover:text-slate-300 transition">Clear</button>
+        </div>
+        <div id="ble-log" class="flex-1 bg-slate-950 border border-slate-800/90 rounded-xl p-2.5 font-mono text-[11px] text-slate-300 overflow-y-auto max-h-[130px] space-y-1">
+          <div class="text-slate-500">[System] Ready. Click "Connect Arduino" or use Simulator.</div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ARDUINO CODE & PROTOCOL MODAL -->
+  <div id="code-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-white">Arduino + Ultrasonic + BLE Sketch</h2>
+          <p class="text-xs text-slate-400">Compatible with HC-08 / HM-10 / ESP32 / Nano 33 BLE</p>
+        </div>
+        <button onclick="toggleCodeModal(false)" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-4 text-sm text-slate-300">
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 text-xs space-y-1.5">
+          <p class="font-bold text-emerald-400">Supported BLE Serial Formats (auto-detected by this app):</p>
+          <ul class="list-disc list-inside text-slate-300 space-y-1 font-mono">
+            <li><span class="text-cyan-400">D:14</span> or raw number <span class="text-cyan-400">14</span> &rarr; Live ultrasonic distance in cm (smoothly moves man up/down &amp; counts reps)</li>
+            <li><span class="text-amber-400">DOWN</span> / <span class="text-cyan-400">UP</span> &rarr; Directly animates stickman down or up</li>
+            <li><span class="text-emerald-400">COUNT:5</span> or <span class="text-emerald-400">REP</span> &rarr; Syncs exact rep count from Arduino</li>
+            <li>App sends <span class="text-rose-400">RESET\n</span> to Arduino when you press Reset.</li>
+          </ul>
+        </div>
+
+        <div class="relative">
+          <button onclick="copyArduinoCode()" id="btn-copy-code"
+            class="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
+            Copy Sketch
+          </button>
+          <pre id="arduino-sketch-code" class="bg-slate-950 border border-slate-800 rounded-2xl p-4 font-mono text-xs text-cyan-200 overflow-x-auto leading-relaxed"><code>// PushUp Sense - Arduino + HC-SR04 + BLE Module (HM-10 / HC-08)
+// Wiring: Trig -> Pin 9, Echo -> Pin 10, BLE TX -> Pin 2, BLE RX -> Pin 3
+#include &lt;SoftwareSerial.h&gt;
+
+SoftwareSerial bleSerial(2, 3); // RX, TX
+const int trigPin = 9;
+const int echoPin = 10;
+
+void setup() {
+  Serial.begin(9600);
+  bleSerial.begin(9600);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+}
+
+void loop() {
+  // Check if Web App sent RESET command
+  if (bleSerial.available()) {
+    String cmd = bleSerial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd == "RESET") {
+      Serial.println("Counter reset by Web App");
+    }
+  }
+
+  // Trigger HC-SR04 Ultrasonic Sensor
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH, 25000);
+  int distanceCm = duration * 0.034 / 2;
+
+  if (distanceCm > 2 && distanceCm < 100) {
+    // Send distance over BLE to PushUp Sense Web App
+    bleSerial.print("D:");
+    bleSerial.println(distanceCm);
+  }
+
+  delay(80); // ~12 Hz smooth animation update rate
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application JavaScript -->
+  <script>
+    /**
+     * PushUp Sense - Web Bluetooth & Interactive Stick-Figure Animation Engine
+     */
+
+    // --- State Variables ---
+    let repCount = 0;
+    let currentDistance = 35;      // in cm (35cm = plank UP, 12cm = chest DOWN)
+    let targetPoseProgress = 0;    // 0.0 = Full UP Plank, 1.0 = Full DOWN Push-up
+    let visualPoseProgress = 0;    // Smoothed animation interpolation value (0.0 -> 1.0)
+    let isDownState = false;       // Hysteresis state tracking for automatic rep counting
+    let downThreshold = 14;        // cm <= 14 triggers DOWN
+    let upThreshold = 28;          // cm >= 28 triggers UP & +1 Rep
+    let soundEnabled = true;
+
+    // --- Web Bluetooth Variables ---
+    let bleDevice = null;
+    let bleCharacteristic = null;
+    let rxBuffer = "";
+
+    // Common BLE UART Service & Characteristic UUIDs (Nordic UART, HM-10/CC254x, DSD TECH, ESP32)
+    const BLE_SERVICES = [
+      "6e400001-b5a3-f393-e0a9-e50e24dcca9e", // Nordic UART Service (NUS)
+      "0000ffe0-0000-1000-8000-00805f9b34fb", // HM-10 / HC-08 / CC2541 Transparent UART
+      "0000dfb0-0000-1000-8000-00805f9b34fb", // DFRobot Bluno
+      "49535343-fe7d-4ae5-8fa9-9fafd205e455"  // Microchip Transparent UART
+    ];
+
+    // --- Web Audio API Synthesizer for Crisp Rep Feedback ---
+    let audioCtx = null;
+    function playTone(freq = 587.33, duration = 0.12, type = "sine", delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === "suspended") {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + delay);
+        osc.stop(audioCtx.currentTime + delay + duration);
+      } catch (e) {
+        // Ignore audio autoplay restriction errors until user interacts
+      }
+    }
+
+    function playRepSound() {
+      // Uplifting double chime
+      playTone(587.33, 0.11, "triangle", 0);     // D5
+      playTone(880.00, 0.18, "triangle", 0.09);  // A5
+    }
+
+    function playDownSound() {
+      playTone(330.00, 0.08, "sine", 0);         // E4 subtle low tick
+    }
+
+    function playResetSound() {
+      playTone(440.00, 0.09, "sine", 0);
+      playTone(329.63, 0.14, "sine", 0.08);
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById("icon-sound-on").classList.toggle("hidden", !soundEnabled);
+      document.getElementById("icon-sound-off").classList.toggle("hidden", soundEnabled);
+      document.getElementById("label-sound").textContent = soundEnabled ? "Beep ON" : "Muted";
+      showToast(soundEnabled ? "Audio feedback enabled" : "Audio feedback muted", "info");
+    }
+
+    // --- Toast Notification Helper (Never uses alert()) ---
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toast-container");
+      const toast = document.createElement("div");
+      const colors = {
+        success: "bg-emerald-950/95 border-emerald-500/60 text-emerald-200",
+        error: "bg-rose-950/95 border-rose-500/60 text-rose-200",
+        info: "bg-slate-900/95 border-cyan-500/50 text-cyan-100"
+      };
+      toast.className = `px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-medium shadow-xl backdrop-blur-md transition-all duration-300 transform translate-y-2 opacity-0 ${colors[type] || colors.info}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove("translate-y-2", "opacity-0");
+      });
+
+      setTimeout(() => {
+        toast.classList.add("opacity-0", "translate-y-2");
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
+
+    function appendLog(text, colorClass = "text-slate-300") {
+      const logEl = document.getElementById("ble-log");
+      const line = document.createElement("div");
+      const now = new Date().toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      line.className = colorClass;
+      line.textContent = `[${now}] ${text}`;
+      logEl.appendChild(line);
+      if (logEl.children.length > 60) {
+        logEl.removeChild(logEl.firstChild);
+      }
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function clearLog() {
+      document.getElementById("ble-log").innerHTML = '<div class="text-slate-500">[System] Log cleared.</div>';
+    }
+
+    // --- Web Bluetooth Connection Logic ---
+    async function handleBluetoothClick() {
+      if (bleDevice && bleDevice.gatt.connected) {
+        bleDevice.gatt.disconnect();
+        return;
+      }
+
+      if (!navigator.bluetooth) {
+        showToast("Web Bluetooth is not supported in this browser. Try Chrome or Edge.", "error");
+        appendLog("Error: navigator.bluetooth unavailable.", "text-rose-400");
+        return;
+      }
+
+      try {
+        updateConnectionUI("connecting");
+        appendLog("Scanning for Arduino BLE devices...", "text-cyan-400");
+
+        bleDevice = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: BLE_SERVICES
+        });
+
+        bleDevice.addEventListener("gattserverdisconnected", onBleDisconnected);
+        appendLog(`Connecting to ${bleDevice.name || "Unnamed BLE Device"}...`, "text-cyan-300");
+
+        const server = await bleDevice.gatt.connect();
+        const services = await server.getPrimaryServices();
+
+        let notifyChar = null;
+        let writeChar = null;
+
+        for (const service of services) {
+          const chars = await service.getCharacteristics();
+          for (const char of chars) {
+            if (char.properties.notify || char.properties.indicate) {
+              notifyChar = char;
+            }
+            if (char.properties.write || char.properties.writeWithoutResponse) {
+              writeChar = char;
+            }
+          }
+          if (notifyChar) break;
+        }
+
+        if (!notifyChar) {
+          throw new Error("No readable/notify UART characteristic found on this BLE device.");
+        }
+
+        bleCharacteristic = writeChar || notifyChar;
+        await notifyChar.startNotifications();
+        notifyChar.addEventListener("characteristicvaluechanged", handleBleData);
+
+        updateConnectionUI("connected", bleDevice.name || "Arduino BLE");
+        showToast(`Connected to ${bleDevice.name || "Arduino BLE"}!`, "success");
+        appendLog(`Connected! Listening for sensor telemetry...`, "text-emerald-400");
+
+      } catch (err) {
+        console.error(err);
+        updateConnectionUI("disconnected");
+        if (err.name !== "NotFoundError") {
+          showToast(`BLE Error: ${err.message}`, "error");
+          appendLog(`BLE Error: ${err.message}`, "text-rose-400");
+        } else {
+          appendLog("Device selection cancelled.", "text-slate-500");
+        }
+      }
+    }
+
+    function onBleDisconnected() {
+      updateConnectionUI("disconnected");
+      showToast("Arduino disconnected.", "info");
+      appendLog("Device disconnected.", "text-amber-400");
+    }
+
+    function updateConnectionUI(state, deviceName = "") {
+      const dot = document.getElementById("status-dot");
+      const text = document.getElementById("status-text");
+      const btnText = document.getElementById("btn-ble-text");
+      const btn = document.getElementById("btn-ble");
+
+      if (state === "connected") {
+        dot.className = "w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]";
+        text.textContent = `Connected: ${deviceName}`;
+        text.className = "text-xs sm:text-sm font-bold text-emerald-300";
+        btnText.textContent = "Disconnect";
+        btn.className = "px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-rose-950/80 border border-emerald-500/40 hover:border-rose-500/60 text-emerald-300 hover:text-rose-200 font-bold text-xs sm:text-sm transition flex items-center gap-2";
+      } else if (state === "connecting") {
+        dot.className = "w-3 h-3 rounded-full bg-amber-400 animate-ping";
+        text.textContent = "Pairing with Arduino...";
+        text.className = "text-xs sm:text-sm font-semibold text-amber-300";
+        btnText.textContent = "Connecting...";
+      } else {
+        dot.className = "w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]";
+        text.textContent = "Disconnected (Simulator Ready)";
+        text.className = "text-xs sm:text-sm font-semibold text-slate-300";
+        btnText.textContent = "Connect Arduino";
+        btn.className = "px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 transition transform active:scale-95 flex items-center gap-2";
+      }
+    }
+
+    async function sendBleCommand(cmd) {
+      if (!bleDevice || !bleDevice.gatt.connected || !bleCharacteristic) return;
+      try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(cmd + "\n");
+        if (bleCharacteristic.properties.writeWithoutResponse) {
+          await bleCharacteristic.writeValueWithoutResponse(data);
+        } else if (bleCharacteristic.properties.write) {
+          await bleCharacteristic.writeValue(data);
+        }
+        appendLog(`TX -> ${cmd}`, "text-cyan-400");
+      } catch (e) {
+        appendLog(`TX Failed: ${e.message}`, "text-rose-400");
+      }
+    }
+
+    // --- Parse Incoming Arduino BLE Serial Data ---
+    function handleBleData(event) {
+      const decoder = new TextDecoder("utf-8");
+      const chunk = decoder.decode(event.target.value);
+      rxBuffer += chunk;
+
+      // Split on newline or carriage return
+      const lines = rxBuffer.split(/[\r\n]+/);
+      rxBuffer = lines.pop(); // Keep incomplete trailing fragment
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        processArduinoInstruction(line);
+      }
+    }
+
+    /**
+     * Interprets instructions from the Arduino:
+     * - "D:15" or "DIST:15" or plain numeric "15" -> Distance in cm
+     * - "DOWN" -> Stickman goes down
+     * - "UP" -> Stickman goes up (and increments rep if coming from DOWN)
+     * - "COUNT:3" or "C:3" -> Explicit count sync from Arduino
+     * - "REP" or "+1" -> Increment count by 1
+     */
+    function processArduinoInstruction(msg) {
+      document.getElementById("raw-rx").textContent = msg;
+      const upper = msg.toUpperCase();
+
+      // 1. Explicit Count from Arduino (e.g., "COUNT:12" or "C:12")
+      const countMatch = upper.match(/^(?:COUNT|C)\s*[:=]\s*(\d+)$/);
+      if (countMatch) {
+        const newVal = parseInt(countMatch[1], 10);
+        if (newVal > repCount) {
+          triggerRepCelebration();
+        }
+        repCount = newVal;
+        updateCounterUI(true);
+        appendLog(`RX <- ${msg} (Synced count: ${repCount})`, "text-emerald-400");
+        return;
+      }
+
+      // 2. Explicit "DOWN" command
+      if (upper === "DOWN" || upper === "DWN") {
+        setDistanceAndPose(downThreshold - 2, true);
+        appendLog(`RX <- ${msg} (Phase: DOWN)`, "text-amber-300");
+        return;
+      }
+
+      // 3. Explicit "UP" command
+      if (upper === "UP") {
+        setDistanceAndPose(upThreshold + 4, true);
+        appendLog(`RX <- ${msg} (Phase: UP)`, "text-cyan-300");
+        return;
+      }
+
+      // 4. Explicit single rep trigger ("REP" or "+1")
+      if (upper === "REP" || upper === "+1") {
+        incrementRep();
+        appendLog(`RX <- ${msg} (+1 Rep)`, "text-emerald-400");
+        return;
+      }
+
+      // 5. Ultrasonic distance reading ("D:18", "DIST:18", "18", "18.5 cm")
+      const distMatch = upper.match(/^(?:D|DIST|DISTANCE)?\s*[:=]?\s*(\d+(?:\.\d+)?)\s*(?:CM)?$/);
+      if (distMatch) {
+        const cm = Math.round(parseFloat(distMatch[1]));
+        if (cm >= 1 && cm <= 150) {
+          setDistanceAndPose(cm, true);
+          return;
+        }
+      }
+
+      // Log unrecognized status strings from Arduino
+      appendLog(`RX <- ${msg}`, "text-slate-400");
+    }
+
+    // --- Core Push-Up Physics & Rep State Machine ---
+    function setDistanceAndPose(cm, fromSensor = false) {
+      currentDistance = cm;
+      document.getElementById("hud-distance").textContent = `${cm} cm`;
+      document.getElementById("sim-slider").value = Math.min(42, Math.max(8, cm));
+
+      // Map distance [downThreshold .. upThreshold] -> poseProgress [1.0 (down) .. 0.0 (up)]
+      const clamped = Math.max(downThreshold - 2, Math.min(upThreshold + 2, cm));
+      const ratio = 1 - ((clamped - (downThreshold - 2)) / ((upThreshold + 2) - (downThreshold - 2)));
+      targetPoseProgress = Math.max(0, Math.min(1, ratio));
+
+      const phaseBadge = document.getElementById("phase-badge");
+
+      // Hysteresis state machine to prevent double-counting noise
+      if (!isDownState && cm <= downThreshold) {
+        isDownState = true;
+        playDownSound();
+        phaseBadge.textContent = "DOWN • PUSH UP!";
+        phaseBadge.className = "px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/50 text-amber-300 text-xs font-bold tracking-wider uppercase";
+      } else if (isDownState && cm >= upThreshold) {
+        isDownState = false;
+        incrementRep();
+        phaseBadge.textContent = "REP COUNTED • UP";
+        phaseBadge.className = "px-3.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-bold tracking-wider uppercase";
+      } else if (!isDownState && cm < upThreshold && cm > downThreshold) {
+        phaseBadge.textContent = "DESCENDING...";
+        phaseBadge.className = "px-3.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 text-xs font-bold tracking-wider uppercase";
+      }
+    }
+
+    function incrementRep() {
+      repCount += 1;
+      updateCounterUI(true);
+      triggerRepCelebration();
+      playRepSound();
+    }
+
+    function resetCounter() {
+      repCount = 0;
+      isDownState = false;
+      targetPoseProgress = 0;
+      currentDistance = upThreshold + 7;
+      document.getElementById("hud-distance").textContent = `${currentDistance} cm`;
+      document.getElementById("sim-slider").value = Math.min(42, currentDistance);
+
+      const phaseBadge = document.getElementById("phase-badge");
+      phaseBadge.textContent = "READY • UP POSITION";
+      phaseBadge.className = "px-3.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 text-xs font-bold tracking-wider uppercase";
+
+      updateCounterUI(true);
+      playResetSound();
+      sendBleCommand("RESET");
+      appendLog("Counter reset to 0.", "text-rose-400");
+      showToast("Counter reset to 0", "info");
+    }
+
+    function updateCounterUI(animate = false) {
+      const counterEl = document.getElementById("rep-counter");
+      counterEl.textContent = repCount;
+
+      if (animate) {
+        counterEl.classList.remove("animate-pop");
+        void counterEl.offsetWidth; // trigger reflow
+        counterEl.classList.add("animate-pop");
+      }
+
+      // Motivational subtitle
+      const motEl = document.getElementById("rep-motivation");
+      const goal = parseInt(document.getElementById("goal-input").value, 10) || 20;
+      if (repCount === 0) {
+        motEl.textContent = "Get into plank position to begin!";
+      } else if (repCount < goal * 0.5) {
+        motEl.textContent = "Strong form! Keep your core tight.";
+      } else if (repCount < goal) {
+        motEl.textContent = `Over halfway! ${goal - repCount} more to hit your target!`;
+      } else {
+        motEl.textContent = "Target crushed! Beast mode activated!";
+      }
+
+      updateGoalUI();
+    }
+
+    function updateGoalUI() {
+      const goal = Math.max(1, parseInt(document.getElementById("goal-input").value, 10) || 20);
+      const pct = Math.min(100, Math.round((repCount / goal) * 100));
+      document.getElementById("goal-progress-text").textContent = `${repCount} / ${goal} Completed`;
+      document.getElementById("goal-percent-text").textContent = `${pct}%`;
+      document.getElementById("goal-bar").style.width = `${pct}%`;
+    }
+
+    function updateThresholds() {
+      const d = parseInt(document.getElementById("thresh-down").value, 10) || 14;
+      const u = parseInt(document.getElementById("thresh-up").value, 10) || 28;
+      downThreshold = Math.min(d, u - 4);
+      upThreshold = Math.max(u, downThreshold + 4);
+      document.getElementById("thresh-down").value = downThreshold;
+      document.getElementById("thresh-up").value = upThreshold;
+      document.getElementById("lbl-down-thresh").textContent = downThreshold;
+      document.getElementById("lbl-up-thresh").textContent = upThreshold;
+    }
+
+    // --- Simulator Controls ---
+    function handleSliderInput(val) {
+      const cm = parseInt(val, 10);
+      document.getElementById("raw-rx").textContent = `SIM:${cm}cm`;
+      setDistanceAndPose(cm, false);
+    }
+
+    function simulateDown() {
+      const cm = Math.max(8, downThreshold - 2);
+      document.getElementById("raw-rx").textContent = `SIM:DOWN (${cm}cm)`;
+      setDistanceAndPose(cm, false);
+    }
+
+    function simulateUp() {
+      const cm = Math.min(42, upThreshold + 5);
+      document.getElementById("raw-rx").textContent = `SIM:UP (${cm}cm)`;
+      setDistanceAndPose(cm, false);
+    }
+
+    function simulateFullRep() {
+      simulateDown();
+      setTimeout(() => {
+        simulateUp();
+      }, 420);
+    }
+
+    // --- Visual Pulse Effect on Rep Completion ---
+    let pulseScale = 0;
+    let pulseOpacity = 0;
+    function triggerRepCelebration() {
+      pulseScale = 10;
+      pulseOpacity = 0.95;
+    }
+
+    // --- Smooth 60FPS SVG Stick-Figure Kinematics Loop ---
+    function lerp(start, end, t) {
+      return start + (end - start) * t;
+    }
+
+    function animateStickman() {
+      // Smoothly interpolate visual pose toward target pose
+      visualPoseProgress = lerp(visualPoseProgress, targetPoseProgress, 0.16);
+      const p = visualPoseProgress; // 0 = Plank UP, 1 = Push-Up DOWN
+
+      // Anchor Points on Floor (Mat top is y=261)
+      const footX = 120, footY = 258;
+      const handX = 435, handY = 258;
+
+      // Shoulder position (pivots down toward ultrasonic sensor at x=415, y=247)
+      const shoulderX = lerp(415, 424, p);
+      const shoulderY = lerp(142, 212, p);
+
+      // Hip position (maintains straight plank alignment from ankle to shoulder)
+      const hipX = lerp(285, 290, p);
+      const hipY = lerp(186, 228, p);
+
+      // Knee position
+      const kneeX = lerp(205, 207, p);
+      const kneeY = lerp(222, 243, p);
+
+      // Elbow position (bends outward/backward as chest lowers)
+      const elbowX = lerp(423, 384, p);
+      const elbowY = lerp(200, 224, p);
+
+      // Far Elbow (for subtle 3D depth)
+      const farElbowX = lerp(427, 392, p);
+      const farElbowY = lerp(198, 220, p);
+
+      // Head & Neck position (aligned with spine angle)
+      const neckX = shoulderX + 27;
+      const neckY = shoulderY - lerp(11, 5, p);
+      const headX = neckX + 23;
+      const headY = neckY - lerp(8, 3, p);
+
+      // Update SVG Stickman Geometry
+      document.getElementById("legs").setAttribute("points", `${footX},${footY} ${kneeX},${kneeY} ${hipX},${hipY}`);
+      document.getElementById("torso").setAttribute("x1", hipX);
+      document.getElementById("torso").setAttribute("y1", hipY);
+      document.getElementById("torso").setAttribute("x2", shoulderX);
+      document.getElementById("torso").setAttribute("y2", shoulderY);
+
+      document.getElementById("neck").setAttribute("x1", shoulderX);
+      document.getElementById("neck").setAttribute("y1", shoulderY);
+      document.getElementById("neck").setAttribute("x2", neckX);
+      document.getElementById("neck").setAttribute("y2", neckY);
+
+      document.getElementById("head").setAttribute("cx", headX);
+      document.getElementById("head").setAttribute("cy", headY);
+      document.getElementById("visor").setAttribute("d", `M ${headX + 7},${headY - 11} L ${headX + 20},${headY - 4}`);
+
+      document.getElementById("arm-near").setAttribute("points", `${shoulderX},${shoulderY} ${elbowX},${elbowY} ${handX},${handY}`);
+      document.getElementById("arm-far").setAttribute("points", `${shoulderX - 3},${shoulderY - 2} ${farElbowX},${farElbowY} ${handX - 5},${handY}`);
+
+      // Update Joint Circles
+      document.getElementById("joint-knee").setAttribute("cx", kneeX);
+      document.getElementById("joint-knee").setAttribute("cy", kneeY);
+      document.getElementById("joint-hip").setAttribute("cx", hipX);
+      document.getElementById("joint-hip").setAttribute("cy", hipY);
+      document.getElementById("joint-shoulder").setAttribute("cx", shoulderX);
+      document.getElementById("joint-shoulder").setAttribute("cy", shoulderY);
+      document.getElementById("joint-elbow").setAttribute("cx", elbowX);
+      document.getElementById("joint-elbow").setAttribute("cy", elbowY);
+
+      // Update Ultrasonic Sensor Distance Beam & Tag
+      const sensorTopY = 247;
+      const chestBottomY = shoulderY + 6;
+      const distLine = document.getElementById("svg-dist-line");
+      distLine.setAttribute("x1", shoulderX);
+      distLine.setAttribute("x2", 415);
+      distLine.setAttribute("y1", sensorTopY);
+      distLine.setAttribute("y2", chestBottomY);
+
+      // Color shift when reaching bottom depth
+      const isDeepEnough = p > 0.78;
+      distLine.setAttribute("stroke", isDeepEnough ? "#f59e0b" : "#10b981");
+      document.getElementById("torso").setAttribute("stroke", isDeepEnough ? "#fbbf24" : "#34d399");
+      document.getElementById("head").setAttribute("stroke", isDeepEnough ? "#fbbf24" : "#34d399");
+
+      const midY = (sensorTopY + chestBottomY) / 2;
+      document.getElementById("svg-dist-tag-bg").setAttribute("y", midY - 10);
+      document.getElementById("svg-dist-tag").setAttribute("y", midY + 4);
+      document.getElementById("svg-dist-tag").textContent = `${currentDistance}cm`;
+
+      // Animate Celebration Ring if active
+      const ring = document.getElementById("rep-pulse-ring");
+      if (pulseOpacity > 0.01) {
+        pulseScale += 3.2;
+        pulseOpacity *= 0.92;
+        ring.setAttribute("cx", shoulderX);
+        ring.setAttribute("cy", shoulderY);
+        ring.setAttribute("r", pulseScale);
+        ring.setAttribute("opacity", pulseOpacity.toFixed(2));
+      } else {
+        ring.setAttribute("opacity", "0");
+      }
+
+      requestAnimationFrame(animateStickman);
+    }
+
+    // --- Modal & Keyboard Shortcut Controls ---
+    function toggleCodeModal(show) {
+      const modal = document.getElementById("code-modal");
+      modal.classList.toggle("hidden", !show);
+    }
+
+    function copyArduinoCode() {
+      const codeText = document.getElementById("arduino-sketch-code").innerText;
+      const textarea = document.createElement("textarea");
+      textarea.value = codeText;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+
+      const btn = document.getElementById("btn-copy-code");
+      btn.textContent = "Copied!";
+      showToast("Arduino sketch copied to clipboard!", "success");
+      setTimeout(() => { btn.textContent = "Copy Sketch"; }, 2000);
+    }
+
+    // Keyboard shortcuts: 'R' to Reset, ArrowDown/ArrowUp to test animation
+    window.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (e.key === "r" || e.key === "R") {
+        resetCounter();
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        simulateDown();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        simulateUp();
+      }
+    });
+
+    // Initialize animation loop on window load
+    window.onload = function () {
+      updateGoalUI();
+      animateStickman();
+    };
+  </script>
+</body>
+</html>
